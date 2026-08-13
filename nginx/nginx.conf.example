@@ -1,0 +1,37 @@
+# Example Nginx site config for deploying this project on a VPS.
+#
+# - Serves the built frontend (frontend/dist) as static files
+# - Proxies /api/ to the FastAPI backend (uvicorn on 127.0.0.1:8000)
+# - Uses a short proxy_read_timeout so a slow backend surfaces as a real
+#   504 Gateway Timeout in the browser, same as it would behind most
+#   production reverse proxies / load balancers.
+#
+# Copy to /etc/nginx/sites-available/skillbytes-admin, adjust paths/domain,
+# then symlink into sites-enabled and reload nginx.
+
+server {
+    listen 80;
+    server_name your-domain-or-ip;
+
+    root /var/www/skillbytes-admin/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Give the backend a reasonable but bounded window to respond.
+        # If it doesn't answer in time, nginx returns 504 to the client.
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 10s;
+        proxy_send_timeout 10s;
+    }
+}
